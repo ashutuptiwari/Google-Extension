@@ -1,45 +1,90 @@
-var ArtistId;
-chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
-    var url = tabs[0].url;
-    var urlElement = document.getElementById('current-url');
-    parts=url.toString().split('/');
-    ArtistId=parts[parts.length-1].toString();
-    urlElement.textContent ="Artist ID: "+ArtistId;
-  });
-document.getElementById("submitButton").addEventListener("click", function () {
-  var resultMessage1 = document.getElementById("resultMessage1");
-  var resultMessage2 = document.getElementById("resultMessage2");
-  var resultMessage3 = document.getElementById("resultMessage3");
-  var resultMessage4 = document.getElementById("resultMessage4");
-  const accessToken =
-    "BQCJ1jsp1xNt7kMbl-fOnJLywSzcK7whNz_Z6702VlLvbcG0i5_GXvaSn1qkXd0y6ZDk-tYBjddKOXCrayBO56kq4AMMvD2xlWXLcMfeGOW4rkj_Hhs";
+let button = document.getElementById("button");
+let content1 = document.getElementById("scraped-content1");
+let content2 = document.getElementById("scraped-content2");
+let content3 = document.getElementById("analysis-result");
 
-  const url = `https://api.spotify.com/v1/artists/${ArtistId}`;
-
-  fetch(url, {
-    method: "GET",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-    },
-  })
-    .then((response) => {
-      console.log(`STATUS: ${response.status}`);
-      console.log(`HEADERS: ${response.headers}`);
-      return response.text();
-    })
-    .then((data) => {
-        const name = JSON.parse(data).name.toString();
-        const genres = JSON.parse(data).genres.toString();
-        const followersTotal = JSON.parse(data).followers.total.toString();
-        const popularity = JSON.parse(data).popularity.toString();
-        resultMessage1.textContent=`NAME: ${name}`;
-        resultMessage2.textContent=`GENRES: ${genres}`;
-        resultMessage3.textContent=`FOLLOWERS: ${followersTotal}`;
-        resultMessage4.textContent=`POPULARITY: ${popularity}`;
-        //resultMessage.textContent=JSON.parse(data).name;
-
-    })
-    .catch((error) => {
-        resultMessage.textContent=error;
-    });
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.html) {
+    content1.textContent = request.html;
+  }
+  if (request.text) {
+    content2.textContent = request.text;
+  }
+  if (request.analysis) {
+    content3.textContent = request.analysis;
+  } else {
+    content3.textContent = "Pata nhi kya hoagaya bc";
+  }
 });
+
+button.addEventListener("click", async () => {
+  let [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  chrome.scripting.executeScript({
+    target: {
+      tabId: tab.id,
+    },
+    function: scrapeEmailContent,
+  });
+});
+
+async function scrapeEmailContent() {
+  const h2Element = document.querySelector('h2[jsname="r4nke"].hP');
+  const paragraph = document.querySelector(".a3s.aiL");
+  let message = {};
+
+  if (h2Element && paragraph) {
+    message.html = h2Element.textContent;
+    message.text = paragraph.textContent;
+  } else if (h2Element) {
+    message.html = h2Element.textContent;
+    message.text = "Content not found";
+  } else if (paragraph) {
+    message.text = paragraph.textContent;
+    message.html = "Subject not found";
+  } else {
+    message.html = "Subject not found";
+    message.text = "Content not found";
+  }
+  const text = paragraph.textContent;
+  const url = "https://ai-textraction.p.rapidapi.com/textraction";
+  const options = {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "X-RapidAPI-Key": "122e1b8b9cmshee53e94722d9c72p164196jsnecec0fe800bb",
+      "X-RapidAPI-Host": "ai-textraction.p.rapidapi.com",
+    },
+    body: JSON.stringify({
+      text: text,
+      entities: [
+        {
+          description: "any date in the text and convert them dd/mm/yyyy format and always take year to be 2023 unless otherwise mentioned in the text",
+          type: "string",
+          var_name: "date",
+        },
+        {
+          description: "any duration in the text in minutes or hours or days",
+          type: "string",
+          var_name: "duration",
+        },
+        {
+          description: "any time mentioned in the text in HHMM format",
+          type: "string",
+          var_name: "time",
+
+        }
+      ],
+    }),
+  };
+
+  try {
+    const response = await fetch(url, options);
+    const result = await response.text();
+    message.analysis = result;
+  } catch (error) {
+    console.error(error);
+    message.analysis = error;
+  }
+
+  chrome.runtime.sendMessage(message);
+}
