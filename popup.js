@@ -10,8 +10,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.text) {
     content2.textContent = request.text;
   }
-  if (request.analysis) {
-    content3.textContent = request.analysis;
+  if (request.date||request.time||request.duration) {
+    const time=request.time;
+    const date=request.date;
+    const duration =request.duration;
+    const timezone= request.timezone;
+    content3.textContent = `DATE:${date} TIME:${time}  DURATION:${duration} TIMEZONE:${timezone}`;
   } else {
     content3.textContent = "Pata nhi kya hoagaya bc";
   }
@@ -71,7 +75,11 @@ async function scrapeEmailContent() {
           description: "any time mentioned in the text in HHMM format",
           type: "string",
           var_name: "time",
-
+        },
+        {
+          description: "TIMEZONE CODE OF THREE LETTERSfor example GMT,UTC, if nothing mentioned use IST",
+          type: "string",
+          var_name: "timezone",
         }
       ],
     }),
@@ -79,11 +87,14 @@ async function scrapeEmailContent() {
 
   try {
     const response = await fetch(url, options);
-    const result = await response.text();
-    message.analysis = result;
+    const result = await response.json();
+    message.date = result.results.date;
+    message.time =  result.results.time;
+    message.duration =  result.results.duration;
+    message.timezone=result.results.timezone;
   } catch (error) {
     console.error(error);
-    message.analysis = error;
+    message.date = error;
   }
 
   chrome.runtime.sendMessage(message);
