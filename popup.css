@@ -12,12 +12,12 @@ body {
     text-align: center;
 }
 
-#button {
+#button , #button3{
     background-color: #3498db;
     color: #fff;
     border: none;
     padding: 10px 20px;
-    margin-bottom: 20px;
+    margin: 20px;
     cursor: pointer;
     border-radius: 5px;
 }
